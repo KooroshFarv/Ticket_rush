@@ -203,3 +203,5 @@ docker run --rm -i \
 2. **Shadow database collision (error P3005)** — running `migrate diff` with `--shadow-database-url` pointing to the same database as the main URL caused Prisma to apply the schema to that database directly, leaving it in a non-empty state. When `prisma migrate deploy` was subsequently run against the same database, it failed with P3005 ("The database schema is not empty"). Fixed by recreating the Postgres container to get a clean database.
 
 3. **Docker Desktop instability on macOS** — Docker Desktop crashed repeatedly during local testing. All full-stack testing (compose up, load test) was moved to an AWS EC2 Ubuntu instance where the Docker daemon is stable.
+
+4. **EC2 build failed: `app/public` directory missing** — the multi-stage Dockerfile contains `COPY --from=builder /app/public ./public`, but Git does not track empty directories. The `app/public/` folder existed locally but was never pushed, so the `COPY` instruction failed on EC2 with "not found". Fixed by adding `app/public/.gitkeep` to force Git to track the directory.
