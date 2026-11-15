@@ -205,3 +205,5 @@ docker run --rm -i \
 3. **Docker Desktop instability on macOS** — Docker Desktop crashed repeatedly during local testing. All full-stack testing (compose up, load test) was moved to an AWS EC2 Ubuntu instance where the Docker daemon is stable.
 
 4. **EC2 build failed: `app/public` directory missing** — the multi-stage Dockerfile contains `COPY --from=builder /app/public ./public`, but Git does not track empty directories. The `app/public/` folder existed locally but was never pushed, so the `COPY` instruction failed on EC2 with "not found". Fixed by adding `app/public/.gitkeep` to force Git to track the directory.
+
+5. **Prisma failed to detect OpenSSL on Alpine** — the `migrate` container crashed at runtime with "Prisma failed to detect the libssl/openssl version… Could not parse schema engine response". `node:22-alpine` does not ship OpenSSL; the Prisma query engine (`linux-musl-openssl-3.0.x`) requires it at runtime. Fixed by adding `RUN apk add --no-cache openssl` to every Dockerfile stage that runs Prisma: `deps`, `migrate`, `builder`, and `runner`.

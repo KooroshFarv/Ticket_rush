@@ -1,6 +1,7 @@
 # ── Stage: deps ─────────────────────────────────────────────────────────────
 # Install all node_modules once; shared by later stages.
 FROM node:22-alpine AS deps
+RUN apk add --no-cache openssl
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -9,6 +10,7 @@ RUN npm ci
 # Lightweight image used only by the "migrate" service in docker-compose.
 # docker-compose overrides CMD to run: prisma migrate deploy && prisma db seed
 FROM node:22-alpine AS migrate
+RUN apk add --no-cache openssl
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json ./
@@ -16,6 +18,7 @@ COPY prisma ./prisma
 
 # ── Stage: builder ───────────────────────────────────────────────────────────
 FROM node:22-alpine AS builder
+RUN apk add --no-cache openssl
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -24,6 +27,7 @@ RUN npm run build
 
 # ── Stage: runner ────────────────────────────────────────────────────────────
 FROM node:22-alpine AS runner
+RUN apk add --no-cache openssl
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
@@ -32,7 +36,7 @@ ENV HOSTNAME="0.0.0.0"
 RUN addgroup --system --gid 1001 nodejs \
  && adduser  --system --uid 1001 nextjs
 
-COPY --from=builder /app/public                              ./public
+COPY --from=builder /app/public                                  ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone  ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static      ./.next/static
 
