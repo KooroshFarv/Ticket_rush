@@ -15,6 +15,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json ./
 COPY prisma ./prisma
+RUN npx prisma generate
 
 # ── Stage: builder ───────────────────────────────────────────────────────────
 FROM node:22-alpine AS builder

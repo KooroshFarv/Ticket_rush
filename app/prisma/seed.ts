@@ -3,9 +3,11 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-  await prisma.order.deleteMany();
-  await prisma.seat.deleteMany();
-  await prisma.event.deleteMany();
+  const existing = await prisma.event.count();
+  if (existing > 0) {
+    console.log('Seed skipped — event data already present.');
+    return;
+  }
 
   const event = await prisma.event.create({
     data: {
