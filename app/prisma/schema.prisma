@@ -1,0 +1,43 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Event {
+  id    String   @id @default(cuid())
+  name  String
+  date  DateTime
+  venue String
+  seats Seat[]
+}
+
+model Seat {
+  id         String     @id @default(cuid())
+  eventId    String
+  seatNumber Int
+  status     SeatStatus @default(AVAILABLE)
+  event      Event      @relation(fields: [eventId], references: [id])
+  order      Order?
+
+  @@unique([eventId, seatNumber])
+}
+
+enum SeatStatus {
+  AVAILABLE
+  SOLD
+}
+
+model Order {
+  id        String   @id @default(cuid())
+  seatId    String   @unique
+  firstName String
+  lastName  String
+  email     String
+  createdAt DateTime @default(now())
+  seat      Seat     @relation(fields: [seatId], references: [id])
+}
