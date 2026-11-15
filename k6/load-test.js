@@ -113,9 +113,9 @@ export function handleSummary(data) {
   console.log('──────────────────────────────────────');
   console.log(' Verify zero double-sells with psql:');
   console.log('');
-  console.log('   SELECT seat_id, COUNT(*) AS n');
+  console.log('   SELECT "seatId", COUNT(*) AS n');
   console.log('   FROM "Order"');
-  console.log('   GROUP BY seat_id');
+  console.log('   GROUP BY "seatId"');
   console.log('   HAVING COUNT(*) > 1;');
   console.log('');
   console.log('   -- Should return 0 rows.');

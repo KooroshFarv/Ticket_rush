@@ -106,13 +106,13 @@ The test requires the full stack to be running (see above). It uses the `grafana
 ```bash
 # From inside the docker-compose network (service name "nginx" resolves):
 docker run --rm -i \
-  --network ticket-rush_default \
+  --network ticket_rush_default \
   grafana/k6 run --env BASE_URL=http://nginx \
   - < k6/load-test.js
 ```
 
 > **Note:** The Docker Compose network name is `<project-directory>_default`.  
-> If your folder is named `ticket-rush`, the network is `ticket-rush_default`.  
+> Docker replaces hyphens with underscores, so the folder `Ticket_rush` → network `ticket_rush_default`.  
 > Check with `docker network ls`.
 
 **Expected results:**
@@ -126,9 +126,9 @@ docker run --rm -i \
 **Verify zero double-sells with SQL:**
 ```sql
 -- Should return 0 rows
-SELECT seat_id, COUNT(*) AS n
+SELECT "seatId", COUNT(*) AS n
 FROM "Order"
-GROUP BY seat_id
+GROUP BY "seatId"
 HAVING COUNT(*) > 1;
 
 -- Should equal 100
@@ -139,7 +139,7 @@ SELECT COUNT(*) AS total_orders FROM "Order";
 # Run from the host:
 docker compose exec postgres \
   psql -U tickets -d tickets \
-  -c 'SELECT seat_id, COUNT(*) AS n FROM "Order" GROUP BY seat_id HAVING COUNT(*) > 1;'
+  -c 'SELECT "seatId", COUNT(*) AS n FROM "Order" GROUP BY "seatId" HAVING COUNT(*) > 1;'
 ```
 
 ---
@@ -177,7 +177,7 @@ docker compose up -d --build
 
 # 5. Run the load test against the public IP
 docker run --rm -i \
-  --network ticket-rush_default \
+  --network ticket_rush_default \
   grafana/k6 run --env BASE_URL=http://nginx \
   - < k6/load-test.js
 ```
@@ -211,3 +211,32 @@ docker run --rm -i \
 6. **Migrate stage missing `prisma generate`** — the seed failed on EC2 with "@prisma/client did not initialize yet. Please run prisma generate". The `migrate` stage copied `node_modules` from `deps` but never ran `prisma generate`, so the generated client was absent. The `builder` stage does run `prisma generate`, but it is a separate image layer not shared with `migrate`. Fixed by adding `RUN npx prisma generate` to the `migrate` stage after copying the `prisma/` folder.
 
 7. **Seed wiped data on every restart** — `seed.ts` called `deleteMany()` unconditionally, so any `docker compose restart` or `docker compose up` destroyed all orders. Fixed by making the seed idempotent: it checks `event.count()` first and skips creation if data already exists. A separate `npm run db:reset` script (`prisma/reset.ts`) handles intentional wipes before load tests.
+
+8. **Wrong Docker Compose network name in k6 command** — the README and k6 summary output used `ticket-rush_default`, but Docker Compose replaces hyphens in project directory names with underscores, making the actual network `ticket_rush_default`. Fixed in both places. The verification SQL also referenced `seat_id` (snake_case) instead of the actual camelCase Prisma column name `"seatId"`.
+
+---
+
+## Results (AWS EC2 t3.small)
+
+**Environment:** Ubuntu 22.04, t3.small (2 vCPU / 2 GB RAM), Docker Engine 24, all services on a single host.
+
+**Load test:** 1 000 requests, 500 VUs, `shared-iterations` executor.
+
+| Metric | Value |
+|--------|-------|
+| Total duration | 6.6 s |
+| 201 Created | **100** |
+| 409 Conflict | **900** |
+| 503 Unavailable | **0** |
+| Double-sold seats | **0** |
+
+**Double-sell verification:**
+```sql
+-- Ran immediately after the load test:
+SELECT "seatId", COUNT(*) AS n FROM "Order" GROUP BY "seatId" HAVING COUNT(*) > 1;
+-- Result: 0 rows
+```
+
+**Load balancing verified:** `curl -I http://<EC2-IP>/api/health` repeated 10 times showed `X-Served-By` alternating between `app1` and `app2`.
+
+**Failover verified:** With the stack running and traffic flowing, `docker compose stop app1` caused all subsequent requests to be served by `app2` with no errors (Nginx passive failover via `max_fails` / `proxy_next_upstream`).
